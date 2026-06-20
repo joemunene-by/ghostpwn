@@ -1,0 +1,67 @@
+# A fully offline demo workflow built entirely on the deterministic `mock`
+# adapter. It needs no external tools and runs anywhere, exercising the DAG,
+# parallel layers, data passing, and findings rollup.
+#
+# Graph shape:
+#
+#   discover ---> enumerate ---> report
+#            \--> fingerprint -/
+#
+# `enumerate` and `fingerprint` both depend on `discover` and run in parallel;
+# `report` waits for both and consumes their outputs via templating.
+
+name: mock-recon-demo
+target: example.com
+
+vars:
+  scope: "in-scope"
+  max_ports: 1000
+
+stages:
+  - id: discover
+    adapter: mock
+    description: "Pretend host discovery."
+    params:
+      outputs:
+        hosts:
+          - "10.0.0.5"
+          - "10.0.0.6"
+      findings:
+        - title: "host 10.0.0.5 responds to discovery"
+          severity: info
+          description: "ICMP echo reply observed."
+
+  - id: enumerate
+    adapter: mock
+    needs: [discover]
+    description: "Pretend service enumeration over discovered hosts."
+    params:
+      echo: "${{ stages.discover.outputs.hosts }}"
+      outputs:
+        services:
+          - "ssh/22"
+          - "http/80"
+      findings:
+        - title: "open SSH service on 10.0.0.5"
+          severity: low
+          description: "Port 22 accepts connections."
+
+  - id: fingerprint
+    adapter: mock
+    needs: [discover]
+    description: "Pretend OS fingerprinting (parallel with enumerate)."
+    params:
+      message: "fingerprinting ${{ vars.scope }} hosts up to ${{ vars.max_ports }} ports"
+      findings:
+        - title: "outdated TLS configuration detected"
+          severity: medium
+          description: "Server negotiates TLS 1.0."
+
+  - id: report
+    adapter: mock
+    needs: [enumerate, fingerprint]
+    description: "Consolidate prior outputs."
+    params:
+      outputs:
+        services_seen: "${{ stages.enumerate.outputs.services }}"
+        target: "${{ target }}"

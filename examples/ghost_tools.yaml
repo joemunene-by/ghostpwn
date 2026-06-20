@@ -1,0 +1,40 @@
+# Example showing how to chain the author's own tooling (ghostrecon, ghostmap)
+# into a single orchestrated engagement using the generic `command` adapter,
+# with structured data flowing between stages. These stages assume the tools are
+# installed and emit JSON; they are marked continue_on_error so the example stays
+# runnable as a demonstration even when the tools are absent.
+
+name: ghost-tools-chain
+target: example.com
+
+vars:
+  recon_profile: "passive"
+
+stages:
+  - id: recon
+    adapter: command
+    continue_on_error: true
+    description: "Passive OSINT recon with ghostrecon, emitting JSON."
+    params:
+      cmd: "ghostrecon"
+      args: ["scan", "${{ target }}", "--profile", "${{ vars.recon_profile }}", "--format", "json"]
+      parse_json: true
+      timeout: 120
+
+  - id: map
+    adapter: command
+    needs: [recon]
+    continue_on_error: true
+    description: "Network/attack-surface mapping with ghostmap."
+    params:
+      cmd: "ghostmap"
+      args: ["--target", "${{ target }}", "--json"]
+      parse_json: true
+      timeout: 180
+
+  - id: probe
+    adapter: http_probe
+    needs: [map]
+    description: "Built-in HTTP probe over the mapped web target."
+    params:
+      url: "https://${{ target }}"

@@ -1,0 +1,43 @@
+# A real, network-touching workflow. Only run this against a target you are
+# explicitly authorized to assess.
+#
+#   dns ---> probe ---> nmap (optional, via the generic command adapter)
+#
+# `dns_recon` resolves the target, `http_probe` checks security headers, and an
+# optional `command` stage wires in nmap. The nmap stage uses continue_on_error
+# so the run still completes if nmap is not installed.
+
+name: web-assessment
+target: example.com
+
+vars:
+  scheme: "https"
+
+stages:
+  - id: dns
+    adapter: dns_recon
+    description: "Resolve A/AAAA/MX/NS records for the target."
+    params:
+      domain: "${{ target }}"
+      records: ["A", "AAAA", "MX"]
+      timeout: 5
+
+  - id: probe
+    adapter: http_probe
+    needs: [dns]
+    description: "Probe the web endpoint and assess security headers."
+    params:
+      url: "${{ vars.scheme }}://${{ target }}"
+      timeout: 10
+      follow_redirects: true
+
+  - id: nmap
+    adapter: command
+    needs: [dns]
+    continue_on_error: true
+    description: "Optional port scan via nmap, wired in with zero code changes."
+    params:
+      cmd: "nmap"
+      args: ["-Pn", "-F", "${{ target }}"]
+      timeout: 120
+      allow_nonzero: true
