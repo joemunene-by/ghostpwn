@@ -1,4 +1,8 @@
-# ghostpwn
+<p align="center">
+  <img src="assets/logo.svg" width="120" height="120" alt="ghostpwn logo">
+</p>
+
+<h1 align="center">ghostpwn</h1>
 
 Automated penetration-test orchestration engine for authorized engagements.
 
